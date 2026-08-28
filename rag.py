@@ -1,6 +1,8 @@
+
 from langchain_community.vectorstores import FAISS
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_ollama import OllamaLLM
+from langchain_groq import ChatGroq
+import os
 
 
 # ============================================
@@ -8,7 +10,18 @@ from langchain_ollama import OllamaLLM
 # ============================================
 
 VECTORSTORE_PATH = "vectorstore"
-OLLAMA_MODEL = "llama3.2:latest"
+GROQ_MODEL = "llama-3.3-70b-versatile"
+
+
+# ============================================
+# Check Groq API Key
+# ============================================
+
+if not os.getenv("GROQ_API_KEY"):
+    raise ValueError(
+        "GROQ_API_KEY is not set. "
+        "Please configure your Groq API key."
+    )
 
 
 # ============================================
@@ -47,13 +60,15 @@ retriever = vectorstore.as_retriever(
 
 
 # ============================================
-# 4. Connect to Ollama
+# 4. Connect to Groq
 # ============================================
 
-print("Connecting to Ollama...")
+print("Connecting to Groq...")
 
-llm = OllamaLLM(
-    model=OLLAMA_MODEL
+llm = ChatGroq(
+    model=GROQ_MODEL,
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0
 )
 
 
@@ -110,7 +125,7 @@ ANSWER:
 
     answer = llm.invoke(prompt)
 
-    return answer
+    return answer.content
 
 
 # ============================================

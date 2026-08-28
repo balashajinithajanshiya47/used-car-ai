@@ -1,5 +1,8 @@
 
-from langchain_ollama import OllamaLLM
+
+import os
+
+from crewai import LLM
 
 from faiss_db import (
     create_faiss_database,
@@ -8,20 +11,29 @@ from faiss_db import (
 
 from crew import analyze_vehicle
 
-import os
-
 
 # ============================================
-# Ollama Configuration
+# GROQ CONFIGURATION
 # ============================================
 
-llm = OllamaLLM(
-    model="llama3.2:latest"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise RuntimeError(
+        "GROQ_API_KEY is not set. "
+        "Run: $env:GROQ_API_KEY='YOUR_NEW_KEY'"
+    )
+
+print("\nUsing Groq Cloud LLM...")
+
+llm = LLM(
+    model="groq/openai/gpt-oss-120b",
+    api_key=GROQ_API_KEY
 )
 
 
 # ============================================
-# Create FAISS Database
+# CREATE FAISS DATABASE
 # ============================================
 
 def load_vehicle_documents():
@@ -61,7 +73,7 @@ def load_vehicle_documents():
 
 
 # ============================================
-# ReAct-Style Reasoning
+# REACT-STYLE REASONING
 # ============================================
 
 def react_reasoning(vehicle_information):
@@ -75,7 +87,7 @@ VEHICLE INFORMATION:
 
 {vehicle_information}
 
-Think through the information step by step.
+Think through the information carefully.
 
 Check:
 
@@ -84,21 +96,28 @@ Check:
 3. Inspection condition
 4. Positive points
 5. Potential concerns
-6. Recommended checks
+6. Recommended checks before purchase
 
-Do not invent information.
+IMPORTANT RULES:
 
-Give a concise reasoning summary that can be
+- Use ONLY the information provided.
+- Do not invent facts.
+- Do not assume missing information.
+- Clearly state when information is unavailable.
+- Separate facts from recommendations.
+- Keep the reasoning concise and useful.
+
+Provide a reasoning summary that can be
 passed to a senior used-car advisor.
 """
 
-    response = llm.invoke(prompt)
+    response = llm.call(prompt)
 
     return response
 
 
 # ============================================
-# Main Workflow
+# MAIN WORKFLOW
 # ============================================
 
 def run_workflow():
@@ -107,7 +126,6 @@ def run_workflow():
     print("       USED CAR REACT WORKFLOW")
     print("===================================")
 
-
     # ----------------------------------------
     # Step 1: Load FAISS
     # ----------------------------------------
@@ -115,13 +133,13 @@ def run_workflow():
     index = load_vehicle_documents()
 
     if index is None:
-
         return
-
 
     # ----------------------------------------
     # Step 2: Retrieve Insurance Information
     # ----------------------------------------
+
+    print("\nSearching insurance information...")
 
     insurance_results = search_faiss(
         index,
@@ -129,10 +147,11 @@ def run_workflow():
         top_k=3
     )
 
-
     # ----------------------------------------
     # Step 3: Retrieve Service Information
     # ----------------------------------------
+
+    print("\nSearching service information...")
 
     service_results = search_faiss(
         index,
@@ -140,17 +159,17 @@ def run_workflow():
         top_k=3
     )
 
-
     # ----------------------------------------
     # Step 4: Retrieve Inspection Information
     # ----------------------------------------
+
+    print("\nSearching inspection information...")
 
     inspection_results = search_faiss(
         index,
         "What are the vehicle inspection and mechanical concerns?",
         top_k=3
     )
-
 
     # ----------------------------------------
     # Step 5: Combine Results
@@ -166,7 +185,6 @@ def run_workflow():
             result["text"] + "\n"
         )
 
-
     vehicle_information += "\nSERVICE INFORMATION:\n"
 
     for result in service_results:
@@ -175,7 +193,6 @@ def run_workflow():
             result["text"] + "\n"
         )
 
-
     vehicle_information += "\nINSPECTION INFORMATION:\n"
 
     for result in inspection_results:
@@ -183,7 +200,6 @@ def run_workflow():
         vehicle_information += (
             result["text"] + "\n"
         )
-
 
     # ----------------------------------------
     # Step 6: ReAct Reasoning
@@ -199,7 +215,6 @@ def run_workflow():
 
     print("\nReasoning Summary:")
     print(reasoning)
-
 
     # ----------------------------------------
     # Step 7: Send to CrewAI
@@ -223,7 +238,6 @@ REASONING SUMMARY:
         final_information
     )
 
-
     # ----------------------------------------
     # Step 8: Final Result
     # ----------------------------------------
@@ -236,7 +250,7 @@ REASONING SUMMARY:
 
 
 # ============================================
-# Run
+# RUN WORKFLOW
 # ============================================
 
 if __name__ == "__main__":

@@ -8,29 +8,22 @@ from crewai import Agent, Task, Crew, Process, LLM
 # LLM CONFIGURATION
 # ============================================
 
-# If GROQ_API_KEY is available:
-#     Use Groq Cloud
-#
-# Otherwise:
-#     Use local Ollama
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if os.getenv("GROQ_API_KEY"):
-
-    print("\nUsing Groq Cloud LLM...")
-
-    llm = LLM(
-        model="groq/llama-3.3-70b-versatile",
-        api_key=os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
+    raise ValueError(
+        "GROQ_API_KEY is not set. "
+        "Please configure your Groq API key."
     )
 
-else:
 
-    print("\nUsing Local Ollama LLM...")
+print("\nUsing Groq Cloud LLM...")
 
-    llm = LLM(
-        model="ollama/llama3.2:latest",
-        base_url="http://localhost:11434"
-    )
+
+llm = LLM(
+    model="groq/openai/gpt-oss-120b",
+    api_key=GROQ_API_KEY
+)
 
 
 # ============================================
@@ -150,7 +143,6 @@ final_agent = Agent(
 # ============================================
 
 def analyze_vehicle(vehicle_information):
-
 
     # ============================================
     # INSURANCE TASK
