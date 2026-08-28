@@ -62,25 +62,32 @@ def retrieve_information(state: VehicleState):
 
     pdf_files = state["pdf_files"]
 
+    if not pdf_files:
+        return {
+            "vehicle_information": "No vehicle PDF documents were found."
+        }
+
     index = create_faiss_database(pdf_files)
 
-    # Search separately
+    # Insurance
     insurance = search_faiss(
         index,
-        "insurance claim accident rear bumper damage",
-        top_k=1
+        "insurance claim accident damage",
+        top_k=2
     )
 
+    # Service
     service = search_faiss(
         index,
-        "service maintenance repair brake transmission engine sensor",
-        top_k=1
+        "service maintenance repair brake transmission engine",
+        top_k=2
     )
 
+    # Inspection
     inspection = search_faiss(
         index,
         "inspection engine transmission brakes tyres body warning light",
-        top_k=1
+        top_k=2
     )
 
     vehicle_information = ""
@@ -91,26 +98,26 @@ def retrieve_information(state: VehicleState):
 
     vehicle_information += "\nINSURANCE HISTORY:\n"
 
-    if insurance:
-        vehicle_information += insurance[0]["text"]
+    for result in insurance:
+        vehicle_information += result["text"] + "\n"
 
     # ----------------------------------------
     # Service
     # ----------------------------------------
 
-    vehicle_information += "\n\nSERVICE HISTORY:\n"
+    vehicle_information += "\nSERVICE HISTORY:\n"
 
-    if service:
-        vehicle_information += service[0]["text"]
+    for result in service:
+        vehicle_information += result["text"] + "\n"
 
     # ----------------------------------------
     # Inspection
     # ----------------------------------------
 
-    vehicle_information += "\n\nINSPECTION REPORT:\n"
+    vehicle_information += "\nINSPECTION REPORT:\n"
 
-    if inspection:
-        vehicle_information += inspection[0]["text"]
+    for result in inspection:
+        vehicle_information += result["text"] + "\n"
 
     print("FAISS retrieval completed.")
 
@@ -132,7 +139,7 @@ def reasoning_node(state: VehicleState):
     information = state["vehicle_information"]
 
     reasoning = f"""
-Analyze this vehicle information before the
+Analyze the vehicle information before the
 CrewAI analysts process it.
 
 Identify:
@@ -145,7 +152,7 @@ Identify:
 
 Use ONLY the information provided.
 
-Do not add assumptions.
+Do not invent facts.
 
 VEHICLE INFORMATION:
 
@@ -173,13 +180,12 @@ def crewai_node(state: VehicleState):
 
     reasoning = state["reasoning"]
 
-    # Keep the information organized
     crew_input = f"""
 VEHICLE INFORMATION:
 
 {information}
 
-REASONING INSTRUCTIONS:
+REASONING:
 
 {reasoning}
 """
