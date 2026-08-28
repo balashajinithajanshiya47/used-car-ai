@@ -1,0 +1,16 @@
+streamlit
+
+langchain
+langchain-community
+langchain-ollama
+langchain-text-splitters
+
+langgraph
+crewai
+
+faiss-cpu
+
+pypdf
+python-docx
+
+sentence-transformers
