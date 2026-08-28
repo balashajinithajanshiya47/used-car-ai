@@ -1,28 +1,30 @@
 
+
 import os
 
-from crewai import Agent, Task, Crew, Process, LLM
+from crewai import Agent, Task, Crew, Process
+from langchain_groq import ChatGroq
 
 
 # ============================================
-# LLM CONFIGURATION
+# GROQ CONFIGURATION
 # ============================================
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
-    raise ValueError(
-        "GROQ_API_KEY is not set. "
-        "Please configure your Groq API key."
+    raise RuntimeError(
+        "GROQ_API_KEY is not configured. "
+        "Add GROQ_API_KEY to Streamlit Cloud Secrets."
     )
-
 
 print("\nUsing Groq Cloud LLM...")
 
 
-llm = LLM(
-    model="groq/openai/gpt-oss-120b",
-    api_key=GROQ_API_KEY
+llm = ChatGroq(
+    model="openai/gpt-oss-120b",
+    api_key=GROQ_API_KEY,
+    temperature=0
 )
 
 
@@ -31,7 +33,6 @@ llm = LLM(
 # ============================================
 
 insurance_agent = Agent(
-
     role="Insurance History Analyst",
 
     goal=(
@@ -59,7 +60,6 @@ insurance_agent = Agent(
 # ============================================
 
 service_agent = Agent(
-
     role="Vehicle Service History Analyst",
 
     goal=(
@@ -87,7 +87,6 @@ service_agent = Agent(
 # ============================================
 
 inspection_agent = Agent(
-
     role="Vehicle Inspection Analyst",
 
     goal=(
@@ -115,7 +114,6 @@ inspection_agent = Agent(
 # ============================================
 
 final_agent = Agent(
-
     role="Senior Used Car Advisor",
 
     goal=(
@@ -139,7 +137,7 @@ final_agent = Agent(
 
 
 # ============================================
-# FUNCTION TO ANALYZE VEHICLE
+# ANALYZE VEHICLE
 # ============================================
 
 def analyze_vehicle(vehicle_information):
@@ -149,7 +147,6 @@ def analyze_vehicle(vehicle_information):
     # ============================================
 
     insurance_task = Task(
-
         description=f"""
 Analyze the following vehicle information.
 
@@ -172,7 +169,7 @@ Do not invent facts.
 
         expected_output=(
             "A concise summary of the vehicle's "
-            "insurance history and any important concerns."
+            "insurance history and important concerns."
         ),
 
         agent=insurance_agent
@@ -184,7 +181,6 @@ Do not invent facts.
     # ============================================
 
     service_task = Task(
-
         description=f"""
 Analyze the following vehicle information.
 
@@ -220,7 +216,6 @@ Do not invent facts.
     # ============================================
 
     inspection_task = Task(
-
         description=f"""
 Analyze the following vehicle information.
 
@@ -254,14 +249,12 @@ Do not invent facts.
 
 
     # ============================================
-    # FINAL ASSESSMENT TASK
+    # FINAL ASSESSMENT
     # ============================================
 
     final_task = Task(
-
         description=f"""
-Review the results from the insurance, service,
-and inspection analysts.
+Review the insurance, service, and inspection analysis.
 
 Vehicle information:
 
@@ -303,7 +296,6 @@ Clearly distinguish between facts and recommendations.
     # ============================================
 
     crew = Crew(
-
         agents=[
             insurance_agent,
             service_agent,
@@ -331,103 +323,3 @@ Clearly distinguish between facts and recommendations.
     result = crew.kickoff()
 
     return result
-
-
-# ============================================
-# TEST CREWAI
-# ============================================
-
-if __name__ == "__main__":
-
-    sample_vehicle_information = """
-
-VEHICLE:
-2019 Example Sedan
-
-INSURANCE HISTORY:
-
-2021:
-Insurance claim recorded for rear bumper damage.
-
-2022:
-No claim recorded.
-
-2023:
-No claim recorded.
-
-2024:
-No claim recorded.
-
-2025:
-No claim recorded.
-
-
-SERVICE HISTORY:
-
-15,000 km:
-Regular service completed.
-
-30,000 km:
-Regular service completed.
-
-45,000 km:
-Brake pads replaced.
-
-60,000 km:
-Transmission fluid replaced.
-
-65,000 km:
-Engine sensor replaced.
-
-68,000 km:
-Regular service completed.
-
-
-INSPECTION:
-
-Mileage:
-68,500 km
-
-Engine:
-Engine starts normally.
-No visible oil leakage observed.
-
-Transmission:
-Transmission shifts normally.
-
-Brakes:
-Front brake pads approximately 40% remaining.
-
-Tyres:
-Front tyres approximately 30% remaining.
-Rear tyres approximately 50% remaining.
-
-Body:
-Minor scratches on rear bumper.
-
-Engine warning light:
-No warning light observed.
-
-Recommendation:
-Vehicle should undergo a professional diagnostic
-scan before purchase.
-
-"""
-
-
-    print("\n===================================")
-    print("       USED CAR CREW AI")
-    print("===================================")
-
-
-    result = analyze_vehicle(
-        sample_vehicle_information
-    )
-
-
-    print("\n===================================")
-    print("       FINAL VEHICLE ASSESSMENT")
-    print("===================================")
-
-
-    print(result)
