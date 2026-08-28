@@ -12,5 +12,5 @@ faiss-cpu
 
 pypdf
 python-docx
-
+langchain-groq
 sentence-transformers
