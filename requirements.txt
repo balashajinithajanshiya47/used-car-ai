@@ -1,16 +1,14 @@
 streamlit
-
 langchain
 langchain-community
-langchain-ollama
 langchain-text-splitters
-
 langgraph
-crewai
+langchain-groq
 
 faiss-cpu
-
 pypdf
 python-docx
-langchain-groq
 sentence-transformers
+
+torch
+torchvision

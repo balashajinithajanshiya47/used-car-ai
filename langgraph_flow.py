@@ -1,16 +1,11 @@
 from typing import TypedDict
-
-from langgraph.graph import StateGraph, START, END
-
-from faiss_db import create_faiss_database, search_faiss
-from crew import analyze_vehicle
-
 import os
 
+from langgraph.graph import StateGraph, START, END
+from langchain_groq import ChatGroq
 
-# ============================================
-# LANGGRAPH STATE
-# ============================================
+from faiss_db import create_faiss_database, search_faiss
+
 
 class VehicleState(TypedDict):
     pdf_files: list
@@ -19,26 +14,27 @@ class VehicleState(TypedDict):
     final_result: str
 
 
-# ============================================
-# 1. LOAD PDF DOCUMENTS
-# ============================================
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+if not GROQ_API_KEY:
+    raise RuntimeError("GROQ_API_KEY is not configured.")
+
+
+llm = ChatGroq(
+    model="openai/gpt-oss-120b",
+    api_key=GROQ_API_KEY,
+    temperature=0
+)
+
 
 def load_documents(state: VehicleState):
 
-    print("\n===================================")
-    print("       LANGGRAPH: LOAD DOCUMENTS")
-    print("===================================")
-
     folder = "documents"
-
     pdf_files = []
 
     if os.path.exists(folder):
-
         for file in os.listdir(folder):
-
             if file.lower().endswith(".pdf"):
-
                 pdf_files.append(
                     os.path.join(folder, file)
                 )
@@ -50,137 +46,117 @@ def load_documents(state: VehicleState):
     }
 
 
-# ============================================
-# 2. RETRIEVE INFORMATION FROM FAISS
-# ============================================
-
 def retrieve_information(state: VehicleState):
-
-    print("\n===================================")
-    print("       LANGGRAPH: FAISS SEARCH")
-    print("===================================")
 
     pdf_files = state["pdf_files"]
 
     if not pdf_files:
         return {
-            "vehicle_information": "No vehicle PDF documents were found."
+            "vehicle_information":
+                "No vehicle PDF documents were found."
         }
 
     index = create_faiss_database(pdf_files)
 
-    # Insurance
     insurance = search_faiss(
         index,
-        "insurance claim accident damage",
-        top_k=2
+        "insurance claim accident damage insurance history",
+        top_k=3
     )
 
-    # Service
     service = search_faiss(
         index,
-        "service maintenance repair brake transmission engine",
-        top_k=2
+        "service maintenance repair servicing brake transmission engine sensor",
+        top_k=3
     )
 
-    # Inspection
     inspection = search_faiss(
         index,
-        "inspection engine transmission brakes tyres body warning light",
-        top_k=2
+        "inspection engine transmission brakes tyres body warning light mechanical condition",
+        top_k=3
     )
 
     vehicle_information = ""
 
-    # ----------------------------------------
-    # Insurance
-    # ----------------------------------------
-
     vehicle_information += "\nINSURANCE HISTORY:\n"
-
     for result in insurance:
         vehicle_information += result["text"] + "\n"
 
-    # ----------------------------------------
-    # Service
-    # ----------------------------------------
-
     vehicle_information += "\nSERVICE HISTORY:\n"
-
     for result in service:
         vehicle_information += result["text"] + "\n"
 
-    # ----------------------------------------
-    # Inspection
-    # ----------------------------------------
-
     vehicle_information += "\nINSPECTION REPORT:\n"
-
     for result in inspection:
         vehicle_information += result["text"] + "\n"
-
-    print("FAISS retrieval completed.")
 
     return {
         "vehicle_information": vehicle_information
     }
 
 
-# ============================================
-# 3. REACT-STYLE REASONING
-# ============================================
-
 def reasoning_node(state: VehicleState):
-
-    print("\n===================================")
-    print("       LANGGRAPH: REASONING")
-    print("===================================")
 
     information = state["vehicle_information"]
 
-    reasoning = f"""
-Analyze the vehicle information before the
-CrewAI analysts process it.
+    prompt = f"""
+You are a used-car reasoning assistant.
+
+Analyze the vehicle information below.
 
 Identify:
 
-- Important insurance events
-- Important service events
-- Inspection concerns
-- Positive points
-- Items that should be checked before purchase
+1. Important insurance events
+2. Important service events
+3. Inspection concerns
+4. Positive points
+5. Items that should be checked before purchase
 
-Use ONLY the information provided.
+Rules:
 
-Do not invent facts.
+- Use ONLY the supplied information.
+- Do not invent facts.
+- Do not assume missing information.
+- Clearly separate facts from recommendations.
 
 VEHICLE INFORMATION:
 
 {information}
 """
 
-    print("Reasoning stage completed.")
+    response = llm.invoke(prompt)
 
     return {
-        "reasoning": reasoning
+        "reasoning": response.content
     }
 
 
-# ============================================
-# 4. CREWAI ANALYSIS
-# ============================================
-
-def crewai_node(state: VehicleState):
-
-    print("\n===================================")
-    print("       LANGGRAPH: CREWAI")
-    print("===================================")
+def final_assessment_node(state: VehicleState):
 
     information = state["vehicle_information"]
-
     reasoning = state["reasoning"]
 
-    crew_input = f"""
+    prompt = f"""
+You are a senior used-car advisor.
+
+Create a final assessment using ONLY the vehicle
+information provided below.
+
+Do not invent facts.
+
+Clearly distinguish facts from recommendations.
+
+Use this structure:
+
+1. OVERALL ASSESSMENT
+2. INSURANCE HISTORY
+3. SERVICE HISTORY
+4. INSPECTION CONDITION
+5. POSITIVE POINTS
+6. POTENTIAL CONCERNS
+7. RECOMMENDED CHECKS BEFORE PURCHASE
+8. FINAL VERDICT
+
 VEHICLE INFORMATION:
 
 {information}
@@ -190,21 +166,14 @@ REASONING:
 {reasoning}
 """
 
-    result = analyze_vehicle(
-        crew_input
-    )
+    response = llm.invoke(prompt)
 
     return {
-        "final_result": str(result)
+        "final_result": response.content
     }
 
 
-# ============================================
-# BUILD LANGGRAPH
-# ============================================
-
 workflow = StateGraph(VehicleState)
-
 
 workflow.add_node(
     "load_documents",
@@ -222,14 +191,9 @@ workflow.add_node(
 )
 
 workflow.add_node(
-    "crewai",
-    crewai_node
+    "final_assessment",
+    final_assessment_node
 )
-
-
-# ============================================
-# EDGES
-# ============================================
 
 workflow.add_edge(
     START,
@@ -248,32 +212,18 @@ workflow.add_edge(
 
 workflow.add_edge(
     "reasoning",
-    "crewai"
+    "final_assessment"
 )
 
 workflow.add_edge(
-    "crewai",
+    "final_assessment",
     END
 )
-
-
-# ============================================
-# COMPILE
-# ============================================
 
 app = workflow.compile()
 
 
-# ============================================
-# TEST
-# ============================================
-
 if __name__ == "__main__":
-
-    print("\n===================================")
-    print("       USED CAR AI")
-    print("       LANGGRAPH WORKFLOW")
-    print("===================================")
 
     initial_state = {
         "pdf_files": [],
@@ -282,12 +232,10 @@ if __name__ == "__main__":
         "final_result": ""
     }
 
-    result = app.invoke(
-        initial_state
-    )
+    result = app.invoke(initial_state)
 
     print("\n===================================")
-    print("       FINAL VEHICLE ASSESSMENT")
+    print("FINAL VEHICLE ASSESSMENT")
     print("===================================")
 
     print(result["final_result"])

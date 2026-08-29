@@ -1,9 +1,6 @@
-
-
 import os
 
-from crewai import Agent, Task, Crew, Process
-from langchain_groq import ChatGroq
+from crewai import Agent, Task, Crew, Process, LLM
 
 
 # ============================================
@@ -14,17 +11,17 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 if not GROQ_API_KEY:
     raise RuntimeError(
-        "GROQ_API_KEY is not configured. "
-        "Add GROQ_API_KEY to Streamlit Cloud Secrets."
+        "GROQ_API_KEY is not set."
     )
 
-print("\nUsing Groq Cloud LLM...")
 
+# ============================================
+# GROQ LLM
+# ============================================
 
-llm = ChatGroq(
-    model="openai/gpt-oss-120b",
-    api_key=GROQ_API_KEY,
-    temperature=0
+llm = LLM(
+    model="groq/openai/gpt-oss-120b",
+    api_key=GROQ_API_KEY
 )
 
 
@@ -37,19 +34,19 @@ insurance_agent = Agent(
 
     goal=(
         "Analyze the vehicle insurance history and "
-        "identify insurance claims, damage history, "
-        "and important insurance-related concerns."
+        "identify insurance claims, accident history, "
+        "damage history, and important insurance concerns."
     ),
 
     backstory=(
         "You are an experienced used-car insurance "
-        "history analyst. You carefully examine vehicle "
-        "records and never invent information."
+        "history analyst. You carefully examine "
+        "vehicle records and never invent information."
     ),
 
     llm=llm,
 
-    verbose=True,
+    verbose=False,
 
     allow_delegation=False
 )
@@ -76,7 +73,7 @@ service_agent = Agent(
 
     llm=llm,
 
-    verbose=True,
+    verbose=False,
 
     allow_delegation=False
 )
@@ -103,7 +100,7 @@ inspection_agent = Agent(
 
     llm=llm,
 
-    verbose=True,
+    verbose=False,
 
     allow_delegation=False
 )
@@ -130,7 +127,7 @@ final_agent = Agent(
 
     llm=llm,
 
-    verbose=True,
+    verbose=False,
 
     allow_delegation=False
 )
@@ -142,9 +139,9 @@ final_agent = Agent(
 
 def analyze_vehicle(vehicle_information):
 
-    # ============================================
-    # INSURANCE TASK
-    # ============================================
+    # ----------------------------------------
+    # Insurance
+    # ----------------------------------------
 
     insurance_task = Task(
         description=f"""
@@ -168,17 +165,17 @@ Do not invent facts.
 """,
 
         expected_output=(
-            "A concise summary of the vehicle's "
-            "insurance history and important concerns."
+            "A concise summary of the vehicle's insurance "
+            "history and important concerns."
         ),
 
         agent=insurance_agent
     )
 
 
-    # ============================================
-    # SERVICE TASK
-    # ============================================
+    # ----------------------------------------
+    # Service
+    # ----------------------------------------
 
     service_task = Task(
         description=f"""
@@ -203,17 +200,17 @@ Do not invent facts.
 """,
 
         expected_output=(
-            "A concise summary of the vehicle's "
-            "service history and maintenance concerns."
+            "A concise summary of the vehicle's service "
+            "history and maintenance concerns."
         ),
 
         agent=service_agent
     )
 
 
-    # ============================================
-    # INSPECTION TASK
-    # ============================================
+    # ----------------------------------------
+    # Inspection
+    # ----------------------------------------
 
     inspection_task = Task(
         description=f"""
@@ -248,17 +245,14 @@ Do not invent facts.
     )
 
 
-    # ============================================
-    # FINAL ASSESSMENT
-    # ============================================
+    # ----------------------------------------
+    # Final Assessment
+    # ----------------------------------------
 
     final_task = Task(
         description=f"""
-Review the insurance, service, and inspection analysis.
-
-Vehicle information:
-
-{vehicle_information}
+Review the vehicle information and the analysis
+performed by the other specialists.
 
 Create a final used-car assessment.
 
@@ -271,9 +265,15 @@ Include:
 5. Potential concerns
 6. Recommended checks before purchase
 
-Do not invent information.
+Only use information provided in the vehicle records.
 
-Clearly distinguish between facts and recommendations.
+Do not invent facts.
+
+Clearly distinguish facts from recommendations.
+
+Vehicle information:
+
+{vehicle_information}
 """,
 
         expected_output=(
@@ -291,9 +291,9 @@ Clearly distinguish between facts and recommendations.
     )
 
 
-    # ============================================
-    # CREATE CREW
-    # ============================================
+    # ----------------------------------------
+    # Crew
+    # ----------------------------------------
 
     crew = Crew(
         agents=[
@@ -312,14 +312,50 @@ Clearly distinguish between facts and recommendations.
 
         process=Process.sequential,
 
-        verbose=True
+        verbose=False
     )
 
 
-    # ============================================
-    # RUN CREW
-    # ============================================
+    # ----------------------------------------
+    # Run
+    # ----------------------------------------
 
     result = crew.kickoff()
 
     return result
+
+
+# ============================================
+# LOCAL TEST
+# ============================================
+
+if __name__ == "__main__":
+
+    print("Testing CrewAI...")
+
+    sample_information = """
+2019 Example Sedan
+
+Insurance:
+One rear bumper insurance claim in 2021.
+
+Service:
+Regular servicing at 15,000 km and 30,000 km.
+Brake pads replaced at 45,000 km.
+
+Inspection:
+Engine starts normally.
+No visible oil leakage.
+Front tyres approximately 30% remaining.
+Professional diagnostic scan recommended.
+"""
+
+    result = analyze_vehicle(
+        sample_information
+    )
+
+    print("\n===================================")
+    print("FINAL RESULT")
+    print("===================================")
+
+    print(result)
